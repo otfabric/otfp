@@ -4,6 +4,9 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/otfabric/otfp)](https://goreportcard.com/report/github.com/otfabric/otfp)
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](https://github.com/otfabric/otfp)
+[![CI](https://github.com/otfp/modbus/actions/workflows/ci.yml/badge.svg)](https://github.com/otfabric/otfp/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/badge/release-v0.1.0-blue.svg)](https://github.com/otfabric/otfp/releases)
+
 
 A pure Go library for OT (Operational Technology) protocol fingerprinting at
 the **connection level only**. Detects industrial protocols based on transport
