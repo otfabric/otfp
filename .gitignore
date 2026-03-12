@@ -2,7 +2,5 @@
 .vscode/
 
 # Ignore build output
-bin/
-
-# Ignore otprobe binary
-./otprobe
+/bin/
+/otprobe

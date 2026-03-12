@@ -1,174 +1,215 @@
-name: Build and Release otprobe
-run-name: "Build and Release of otprobe on '${{ github.ref_name }}' with bump '${{ github.event.inputs.bump }}'"
+# Unified release workflow: safe, deterministic, first-release friendly.
+#
+# Combines: (A) RELEASE.md notes + first-release bootstrap + gh release create,
+#           (B) default-branch check, tests-before-release, immutable tags, concurrency.
+#           (C) Cross-compiled otprobe binaries attached to the release.
+#
+# Repo customization points:
+#  - Test step: replace "Setup Go" + "Test" with your lint/test/build (e.g. npm test, make test).
+#  - Workflow name: change "Release Library" if desired.
+#  - Release notes: RELEASE.md first block (up to "---") or git log; adjust path/pattern if needed.
+#  - Runtime: add/skip setup (Go, Node, etc.) per repo.
+
+name: Release otfabric/otfp Library
+
+run-name: Release (${{ inputs.bump }}) from ${{ github.ref_name }}
 
 on:
   workflow_dispatch:
     inputs:
       bump:
-        description: "Version bump strategy (none, patch, minor, major)"
+        description: "Version bump type"
         required: true
-        default: "none"
         type: choice
         options:
-          - none
           - patch
           - minor
           - major
+        default: patch
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
-  bump-version:
-    name: Bump Version
+  release:
+    name: release
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.bump.outputs.version }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          fetch-tags: true
 
-      - name: Configure git
+      - name: Verify default branch
         run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-
-      - name: Bump version
-        id: bump
-        run: |
-          VERSION=$(cat cmd/otprobe/version.txt)
-          IFS='.' read -r major minor patch <<< "$VERSION"
-          case "${{ github.event.inputs.bump }}" in
-            major)
-              major=$((major + 1)); minor=0; patch=0 ;;
-            minor)
-              minor=$((minor + 1)); patch=0 ;;
-            patch)
-              patch=$((patch + 1)) ;;
-            none)
-              ;;
-          esac
-          NEW_VERSION="$major.$minor.$patch"
-          echo "$NEW_VERSION" > cmd/otprobe/version.txt
-          git add cmd/otprobe/version.txt
-          if [[ "${{ github.event.inputs.bump }}" != "none" ]]; then
-            git commit -m "Bump version to $NEW_VERSION"
-            git push origin HEAD
+          set -euo pipefail
+          default="${{ github.event.repository.default_branch }}"
+          current="${{ github.ref_name }}"
+          if [ "$current" != "$default" ]; then
+            echo "::error::Releases are only allowed from the default branch. Current ref: $current, default branch: $default"
+            exit 1
           fi
-          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Running on default branch: $default"
 
-      - name: Show calculated version
-        run: |
-          echo "🔖 Final version to build: $(cat cmd/otprobe/version.txt)"
-
-  build:
-    name: Build ${{ matrix.target }}
-    needs: bump-version
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: linux-amd64
-            goos: linux
-            goarch: amd64
-          - os: ubuntu-latest
-            target: linux-arm64
-            goos: linux
-            goarch: arm64
-          - os: ubuntu-latest
-            target: linux-armv7
-            goos: linux
-            goarch: arm
-            goarm: "7"
-          - os: ubuntu-latest
-            target: darwin-amd64
-            goos: darwin
-            goarch: amd64
-          - os: ubuntu-latest
-            target: darwin-arm64
-            goos: darwin
-            goarch: arm64
-          - os: ubuntu-latest
-            target: windows-amd64
-            goos: windows
-            goarch: amd64
-            ext: .exe
-    runs-on: ${{ matrix.os }}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.repository.default_branch }}
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      # --- Repo customization: replace with your test/lint/build ---
+      - name: Setup Go
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
 
-      - name: Build release binary
-        env:
-          VERSION: ${{ needs.bump-version.outputs.version }}
-          CGO_ENABLED: "0"
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          GOARM: ${{ matrix.goarm }}
+      - name: Test
         run: |
-          echo "$VERSION" > cmd/otprobe/version.txt
-          BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
-          REVISION=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-          BUILD_DATE=$(date -u +%Y%m%d-%H:%M:%S)
-          LDFLAGS="-X main.Version=$VERSION -X main.Branch=$BRANCH -X main.Revision=$REVISION -X main.BuildUser=github-actions -X main.BuildDate=$BUILD_DATE"
+          set -euo pipefail
+          go test $(go list ./... | grep -v '/examples$')
+
+      # --- Version detection (semver vX.Y.Z, bootstrap from v0.0.0 if no tags) ---
+      - name: Determine version
+        id: version
+        run: |
+          set -euo pipefail
+          bump="${{ inputs.bump }}"
+          # Latest semver tag; sort -V handles semantic ordering
+          previous_tag=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -1)
+          if [ -z "$previous_tag" ]; then
+            previous_tag="v0.0.0"
+          fi
+          previous_version="${previous_tag#v}"
+          IFS='.' read -r major minor patch <<< "$previous_version"
+
+          case "$bump" in
+            major)  major=$((major + 1)); minor=0; patch=0 ;;
+            minor)  minor=$((minor + 1)); patch=0 ;;
+            patch)  patch=$((patch + 1)) ;;
+            *)      echo "::error::Invalid bump: $bump"; exit 1 ;;
+          esac
+
+          version="${major}.${minor}.${patch}"
+          tag="v${version}"
+
+          echo "previous_tag=$previous_tag" >> "$GITHUB_OUTPUT"
+          echo "previous_version=$previous_version" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Fail if tag already exists
+        run: |
+          set -euo pipefail
+          tag="${{ steps.version.outputs.tag }}"
+          if git rev-parse "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "::error::Tag $tag already exists. Tags are immutable; choose a different bump or do not re-release."
+            exit 1
+          fi
+
+      - name: Update version.txt
+        run: |
+          set -euo pipefail
+          echo "${{ steps.version.outputs.version }}" > cmd/otprobe/version.txt
+
+      - name: Build cross-platform binaries
+        run: |
+          set -euo pipefail
+          version="${{ steps.version.outputs.version }}"
+          revision=$(git rev-parse --short HEAD)
+          branch="${{ github.ref_name }}"
+          build_date=$(date -u +%Y%m%d-%H:%M:%S)
+          ldflags="-X main.Version=${version} -X main.Branch=${branch} -X main.Revision=${revision} -X main.BuildUser=github-actions -X main.BuildDate=${build_date}"
 
           mkdir -p release
-          go build -ldflags "$LDFLAGS" -o "release/otprobe${{ matrix.ext }}" ./cmd/otprobe
-          tar -czf "release/otprobe-${VERSION}-${{ matrix.target }}.tar.gz" -C release "otprobe${{ matrix.ext }}"
-          rm -f "release/otprobe${{ matrix.ext }}"
-          echo "Created release/otprobe-${VERSION}-${{ matrix.target }}.tar.gz"
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: otprobe-${{ needs.bump-version.outputs.version }}-${{ matrix.target }}
-          path: release/otprobe-${{ needs.bump-version.outputs.version }}-${{ matrix.target }}.tar.gz
+          platforms=(
+            "linux:amd64::"
+            "linux:arm64::"
+            "linux:arm:7:"
+            "darwin:amd64::"
+            "darwin:arm64::"
+            "windows:amd64::.exe"
+          )
 
-  create-github-release:
-    name: Create GitHub Release
-    needs:
-      - bump-version
-      - build
-    runs-on: ubuntu-latest
+          for entry in "${platforms[@]}"; do
+            IFS=':' read -r goos goarch goarm ext <<< "$entry"
+            target="${goos}-${goarch}"
+            [ "$goarch" = "arm" ] && [ -n "$goarm" ] && target="${goos}-armv${goarm}"
 
-    steps:
-      - uses: actions/checkout@v4
+            echo "Building otprobe for ${target}..."
+            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" GOARM="$goarm" \
+              go build -ldflags "$ldflags" -o "release/otprobe${ext}" ./cmd/otprobe
+            tar -czf "release/otprobe-${version}-${target}.tar.gz" -C release "otprobe${ext}"
+            rm -f "release/otprobe${ext}"
+          done
 
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          pattern: otprobe-${{ needs.bump-version.outputs.version }}-*
-          merge-multiple: true
+          ls -lh release/
 
-      - name: List downloaded artifacts
-        run: ls -lah artifacts/
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ needs.bump-version.outputs.version }}
-          name: v${{ needs.bump-version.outputs.version }}
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-          files: artifacts/*.tar.gz
-
-      - name: Publish summary
+      - name: Generate release notes
+        id: notes
         run: |
-          {
-            echo "## Release created"
-            echo "- Bump type: ${{ github.event.inputs.bump }}"
-            echo "- Version: ${{ needs.bump-version.outputs.version }}"
-            echo "- Tag: v${{ needs.bump-version.outputs.version }}"
-          } >> "$GITHUB_STEP_SUMMARY"
+          set -euo pipefail
+          tag="${{ steps.version.outputs.tag }}"
+          prev="${{ steps.version.outputs.previous_tag }}"
+          used_release_md="false"
+
+          if [ -f RELEASE.md ]; then
+            # First block only: up to first line exactly "---"
+            awk '/^---$/ { exit } { print }' RELEASE.md > "$RUNNER_TEMP/release-notes.md"
+            used_release_md="true"
+          else
+            {
+              echo "## Changes since ${prev}"
+              echo ""
+              git log "${prev}..HEAD" --pretty=format:"- %s (%h)" 2>/dev/null || echo "- Initial release"
+            } > "$RUNNER_TEMP/release-notes.md"
+          fi
+
+          echo "file=$RUNNER_TEMP/release-notes.md" >> "$GITHUB_OUTPUT"
+          echo "used_release_md=$used_release_md" >> "$GITHUB_OUTPUT"
+
+      - name: Commit version.txt update
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet cmd/otprobe/version.txt; then
+            git add cmd/otprobe/version.txt
+            git commit -m "Bump version to ${{ steps.version.outputs.version }}"
+            git push origin HEAD
+          fi
+
+      - name: Create and push annotated tag
+        run: |
+          set -euo pipefail
+          tag="${{ steps.version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "Release $tag" HEAD
+          git push origin "refs/tags/$tag"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.version.outputs.tag }}"
+          gh release create "$tag" \
+            --title "$tag" \
+            --notes-file "${{ steps.notes.outputs.file }}" \
+            --target "${{ github.sha }}" \
+            release/otprobe-*.tar.gz
+
+      - name: Summary
+        run: |
+          echo "## Release summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Item | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Bump | ${{ inputs.bump }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Previous tag | ${{ steps.version.outputs.previous_tag }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| New tag | ${{ steps.version.outputs.tag }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Notes from RELEASE.md | ${{ steps.notes.outputs.used_release_md }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Tests | Passed (run before release) |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Binaries | linux-amd64, linux-arm64, linux-armv7, darwin-amd64, darwin-arm64, windows-amd64 |" >> "$GITHUB_STEP_SUMMARY"
