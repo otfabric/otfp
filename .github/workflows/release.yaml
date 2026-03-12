@@ -1,0 +1,174 @@
+name: Build and Release otprobe
+run-name: "Build and Release of otprobe on '${{ github.ref_name }}' with bump '${{ github.event.inputs.bump }}'"
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump strategy (none, patch, minor, major)"
+        required: true
+        default: "none"
+        type: choice
+        options:
+          - none
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  bump-version:
+    name: Bump Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Bump version
+        id: bump
+        run: |
+          VERSION=$(cat cmd/otprobe/version.txt)
+          IFS='.' read -r major minor patch <<< "$VERSION"
+          case "${{ github.event.inputs.bump }}" in
+            major)
+              major=$((major + 1)); minor=0; patch=0 ;;
+            minor)
+              minor=$((minor + 1)); patch=0 ;;
+            patch)
+              patch=$((patch + 1)) ;;
+            none)
+              ;;
+          esac
+          NEW_VERSION="$major.$minor.$patch"
+          echo "$NEW_VERSION" > cmd/otprobe/version.txt
+          git add cmd/otprobe/version.txt
+          if [[ "${{ github.event.inputs.bump }}" != "none" ]]; then
+            git commit -m "Bump version to $NEW_VERSION"
+            git push origin HEAD
+          fi
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Show calculated version
+        run: |
+          echo "🔖 Final version to build: $(cat cmd/otprobe/version.txt)"
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: bump-version
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-amd64
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-latest
+            target: linux-arm64
+            goos: linux
+            goarch: arm64
+          - os: ubuntu-latest
+            target: linux-armv7
+            goos: linux
+            goarch: arm
+            goarm: "7"
+          - os: ubuntu-latest
+            target: darwin-amd64
+            goos: darwin
+            goarch: amd64
+          - os: ubuntu-latest
+            target: darwin-arm64
+            goos: darwin
+            goarch: arm64
+          - os: ubuntu-latest
+            target: windows-amd64
+            goos: windows
+            goarch: amd64
+            ext: .exe
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build release binary
+        env:
+          VERSION: ${{ needs.bump-version.outputs.version }}
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+        run: |
+          echo "$VERSION" > cmd/otprobe/version.txt
+          BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+          REVISION=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+          BUILD_DATE=$(date -u +%Y%m%d-%H:%M:%S)
+          LDFLAGS="-X main.Version=$VERSION -X main.Branch=$BRANCH -X main.Revision=$REVISION -X main.BuildUser=github-actions -X main.BuildDate=$BUILD_DATE"
+
+          mkdir -p release
+          go build -ldflags "$LDFLAGS" -o "release/otprobe${{ matrix.ext }}" ./cmd/otprobe
+          tar -czf "release/otprobe-${VERSION}-${{ matrix.target }}.tar.gz" -C release "otprobe${{ matrix.ext }}"
+          rm -f "release/otprobe${{ matrix.ext }}"
+          echo "Created release/otprobe-${VERSION}-${{ matrix.target }}.tar.gz"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: otprobe-${{ needs.bump-version.outputs.version }}-${{ matrix.target }}
+          path: release/otprobe-${{ needs.bump-version.outputs.version }}-${{ matrix.target }}.tar.gz
+
+  create-github-release:
+    name: Create GitHub Release
+    needs:
+      - bump-version
+      - build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: otprobe-${{ needs.bump-version.outputs.version }}-*
+          merge-multiple: true
+
+      - name: List downloaded artifacts
+        run: ls -lah artifacts/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.bump-version.outputs.version }}
+          name: v${{ needs.bump-version.outputs.version }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: artifacts/*.tar.gz
+
+      - name: Publish summary
+        run: |
+          {
+            echo "## Release created"
+            echo "- Bump type: ${{ github.event.inputs.bump }}"
+            echo "- Version: ${{ needs.bump-version.outputs.version }}"
+            echo "- Tag: v${{ needs.bump-version.outputs.version }}"
+          } >> "$GITHUB_STEP_SUMMARY"

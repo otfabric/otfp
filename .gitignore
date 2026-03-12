@@ -1,0 +1,8 @@
+# Ignore Visual Studio Code settings and build output
+.vscode/
+
+# Ignore build output
+bin/
+
+# Ignore otprobe binary
+./otprobe
