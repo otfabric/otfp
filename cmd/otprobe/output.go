@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/otfabric/otfp/core"
+	"github.com/otfabric/go-otfp/core"
 )
 
 // Exit codes — stable numeric API for callers.

@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/otfabric/otfp/core"
+	"github.com/otfabric/go-otfp/core"
 )
 
 // protocolAliases maps short CLI names to typed Protocol identifiers.

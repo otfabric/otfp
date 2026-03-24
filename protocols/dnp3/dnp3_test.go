@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/otfabric/otfp/core"
+	"github.com/otfabric/go-otfp/core"
 )
 
 // startMockServer starts a TCP server that accepts one connection,

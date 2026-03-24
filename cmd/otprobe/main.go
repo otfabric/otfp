@@ -11,27 +11,26 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/otfabric/otfp/core"
-	"github.com/otfabric/otfp/protocols/bacnet"
-	"github.com/otfabric/otfp/protocols/can"
-	"github.com/otfabric/otfp/protocols/dnp3"
-	"github.com/otfabric/otfp/protocols/enip"
-	"github.com/otfabric/otfp/protocols/iec104"
-	"github.com/otfabric/otfp/protocols/mms"
-	"github.com/otfabric/otfp/protocols/modbus"
-	"github.com/otfabric/otfp/protocols/opcua"
-	"github.com/otfabric/otfp/protocols/profinet"
-	"github.com/otfabric/otfp/protocols/s7"
+	"github.com/otfabric/go-otfp/core"
+	"github.com/otfabric/go-otfp/protocols/bacnet"
+	"github.com/otfabric/go-otfp/protocols/can"
+	"github.com/otfabric/go-otfp/protocols/dnp3"
+	"github.com/otfabric/go-otfp/protocols/enip"
+	"github.com/otfabric/go-otfp/protocols/iec104"
+	"github.com/otfabric/go-otfp/protocols/mms"
+	"github.com/otfabric/go-otfp/protocols/modbus"
+	"github.com/otfabric/go-otfp/protocols/opcua"
+	"github.com/otfabric/go-otfp/protocols/profinet"
+	"github.com/otfabric/go-otfp/protocols/s7"
 	"github.com/spf13/cobra"
 )
 
 // Build-time variables injected via ldflags.
 var (
-	Version   = "dev"
-	Branch    = "unknown"
-	Revision  = "unknown"
-	BuildUser = "unknown"
-	BuildDate = "unknown"
+	version   = "dev"
+	tag       = ""
+	commit    = "unknown"
+	buildDate = "unknown"
 )
 
 func main() {

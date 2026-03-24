@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/otfabric/otfp/core"
+	"github.com/otfabric/go-otfp/core"
 )
 
 func startMockServer(t *testing.T, response []byte) (string, func()) {
@@ -50,7 +50,7 @@ func parseAddr(addr string) (string, int) {
 func buildBindAckResponse(accepted bool) []byte {
 	// Minimal Bind-Ack: header(16) + max_xmit(2) + max_recv(2) + assoc(4) +
 	// sec_addr_len(2) + sec_addr("") + pad + num_results(4) + result(4+20)
-	secAddr := []byte{0x00}  // empty secondary addr
+	secAddr := []byte{0x00} // empty secondary addr
 	secAddrLen := uint16(len(secAddr))
 	padLen := 0
 	if int(secAddrLen)%2 != 0 {
@@ -81,9 +81,9 @@ func buildBindAckResponse(accepted bool) []byte {
 
 	// Body.
 	off := 16
-	binary.LittleEndian.PutUint16(msg[off:off+2], 5840) // max_xmit
+	binary.LittleEndian.PutUint16(msg[off:off+2], 5840)   // max_xmit
 	binary.LittleEndian.PutUint16(msg[off+2:off+4], 5840) // max_recv
-	binary.LittleEndian.PutUint32(msg[off+4:off+8], 0) // assoc_group
+	binary.LittleEndian.PutUint32(msg[off+4:off+8], 0)    // assoc_group
 	binary.LittleEndian.PutUint16(msg[off+8:off+10], secAddrLen)
 	copy(msg[off+10:off+10+int(secAddrLen)], secAddr)
 	resultStart := off + 10 + int(secAddrLen) + padLen

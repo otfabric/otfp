@@ -4,3 +4,8 @@
 # Ignore build output
 /bin/
 /otprobe
+
+# Ignore coverage files
+cover.*
+coverage.*
+*.out

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/otfabric/otfp/core"
+	"github.com/otfabric/go-otfp/core"
 )
 
 func startMockServer(t *testing.T, response []byte) (string, func()) {
