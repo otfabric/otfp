@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	"github.com/otfabric/otfp/core"
+	"github.com/otfabric/go-otfp/core"
 )
 
 // CLIConfig holds the resolved CLI configuration after flag parsing.

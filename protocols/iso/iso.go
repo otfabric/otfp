@@ -4,8 +4,8 @@ package iso
 
 // TPKT constants (RFC 1006).
 const (
-	TPKTVersion  = 0x03
-	TPKTReserved = 0x00
+	TPKTVersion   = 0x03
+	TPKTReserved  = 0x00
 	TPKTHeaderLen = 4
 )
 
@@ -35,11 +35,11 @@ func BuildTPKT(payload []byte) []byte {
 // tpduClass: transport class (typically 0)
 func BuildCOTPConnectionRequest(dstRef, srcRef uint16, tpduClass byte) []byte {
 	cotp := []byte{
-		0x06,                                       // COTP header length (excluding this byte)
-		COTPTypeCR,                                  // CR PDU type
-		byte(dstRef >> 8), byte(dstRef & 0xFF),      // Destination reference
-		byte(srcRef >> 8), byte(srcRef & 0xFF),      // Source reference
-		tpduClass,                                   // Class 0, no extended formats
+		0x06,                                   // COTP header length (excluding this byte)
+		COTPTypeCR,                             // CR PDU type
+		byte(dstRef >> 8), byte(dstRef & 0xFF), // Destination reference
+		byte(srcRef >> 8), byte(srcRef & 0xFF), // Source reference
+		tpduClass, // Class 0, no extended formats
 	}
 	return cotp
 }

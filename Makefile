@@ -11,12 +11,11 @@ BIN_DIR := bin
 PKGS := $(shell go list ./...)
 
 # Version info
-VERSION := $(shell cat cmd/otprobe/version.txt)
-BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
-REVISION := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
-BUILD_USER := $(shell whoami)
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+TAG := $(shell git describe --tags --exact-match 2>/dev/null || echo "")
+COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 BUILD_DATE := $(shell date -u +%Y%m%d-%H:%M:%S)
-LDFLAGS := -X main.Version=$(VERSION) -X main.Branch=$(BRANCH) -X main.Revision=$(REVISION) -X main.BuildUser=$(BUILD_USER) -X main.BuildDate=$(BUILD_DATE)
+LDFLAGS := -s -w -X main.version=$(VERSION) -X main.tag=$(TAG) -X main.commit=$(COMMIT) -X main.buildDate=$(BUILD_DATE)
 
 all: build ## Default target: build otprobe binary
 
@@ -27,16 +26,17 @@ build: check ## Build otprobe binary
 install: build ## Install otprobe to /usr/local/bin (may require sudo)
 	sudo install -m 0755 $(BIN_DIR)/otprobe /usr/local/bin/otprobe
 
-lint: ## Run linter (golangci-lint preferred, fallback golint)
-	@echo "Running linter..."
-	@if command -v golangci-lint >/dev/null 2>&1; then \
-		golangci-lint run ./...; \
-	elif command -v golint >/dev/null 2>&1; then \
-		golint $(PKGS); \
-	else \
-		echo "No Go linter found. Install golangci-lint or golint."; \
-		exit 1; \
-	fi
+fmt: ## Format Go code with gofmt
+	@echo "Running gofmt"
+	@gofmt -w .
+
+lint: ## Run staticcheck
+	@echo "Running staticcheck"
+	@staticcheck $(PKGS)
+
+lint-ci: ## Run golangci-lint
+	@echo "Running golangci-lint"
+	@golangci-lint run ./...
 
 vet: ## Run go vet on project packages
 	@echo "Running go vet on packages: $(PKGS)"
@@ -50,7 +50,15 @@ test-race: ## Run tests with race detector (CI-like)
 	@echo "Running race tests on packages: $(PKGS)"
 	@go test -count=1 -timeout=120s -race $(PKGS)
 
-check: lint vet test test-race ## Run lint + vet + test
+coverage: ## Run tests with coverage on core library only (writes coverage.out)
+	@echo "Running coverage"
+	@go test -count=1 -race -coverprofile=coverage.out -covermode=atomic $(TEST_PKGS)
+
+cover: coverage ## Open coverage report in browser
+	@echo "Opening coverage report"
+	@go tool cover -html=coverage.out
+
+check: fmt lint lint-ci vet test test-race coverage ## Run lint + vet + test
 
 clean: ## Remove generated binaries
 	@rm -rf $(BIN_DIR)

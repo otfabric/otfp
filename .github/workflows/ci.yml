@@ -7,36 +7,14 @@ on:
   pull_request:
     branches: ["**"]
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   ci:
-    name: Lint, Vet & Test
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Download dependencies
-        run: go mod download
-
-      - name: Verify dependencies
-        run: go mod verify
-
-      - name: go vet
-        run: go vet ./...
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v7
-        with:
-          version: v2.10.1
-          args: --timeout=5m
-
-      - name: Test
-        run: go test -count=1 -timeout=120s -race ./...
+    uses: otfabric/.github/.github/workflows/go-ci.yml@v2
+    with:
+      codecov-name: go-otfp
+      go-versions: '["1.23","1.24","1.25","1.26"]'
+    secrets: inherit

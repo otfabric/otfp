@@ -1,11 +1,11 @@
 # otfp — OT Protocol Fingerprinting Library
 
-[![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Go Report Card](https://goreportcard.com/badge/github.com/otfabric/otfp)](https://goreportcard.com/report/github.com/otfabric/otfp)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](https://github.com/otfabric/otfp)
-[![CI](https://github.com/otfp/modbus/actions/workflows/ci.yml/badge.svg)](https://github.com/otfabric/otfp/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/badge/release-v0.1.0-blue.svg)](https://github.com/otfabric/otfp/releases)
+[![Go Report Card](https://goreportcard.com/badge/github.com/otfabric/go-otfp)](https://goreportcard.com/report/github.com/otfabric/go-otfp)
+[![CI](https://github.com/otfp/modbus/actions/workflows/ci.yml/badge.svg)](https://github.com/otfabric/go-otfp/actions/workflows/ci.yml)
+[![Codecov](https://codecov.io/github/otfabric/go-otfp/graph/badge.svg?token=QHOOHJTJHT)](https://codecov.io/github/otfabric/go-otfp)
+[![Release](https://img.shields.io/github/v/release/otfabric/go-otfp?display_name=tag)](https://github.com/otfabric/go-otfp/releases)
 
 
 A pure Go library for OT (Operational Technology) protocol fingerprinting at
@@ -96,13 +96,13 @@ real-world deployments:
 ### Library
 
 ```bash
-go get github.com/otfabric/otfp
+go get github.com/otfabric/go-otfp
 ```
 
 ### CLI Tool
 
 ```bash
-go install github.com/otfabric/otfp/cmd/otprobe@latest
+go install github.com/otfabric/go-otfp/cmd/otprobe@latest
 ```
 
 ---
@@ -199,7 +199,7 @@ otprobe version 0.1.0
   revision:   abc1234
   build user: ci
   build date: 20250115-10:30:00
-  go version: go1.25.0
+  go version: go1.23.0
   platform:   linux/amd64
 ```
 
@@ -310,10 +310,10 @@ import (
     "fmt"
     "time"
 
-    "github.com/otfabric/otfp/core"
-    "github.com/otfabric/otfp/protocols/modbus"
-    "github.com/otfabric/otfp/protocols/mms"
-    "github.com/otfabric/otfp/protocols/s7"
+    "github.com/otfabric/go-otfp/core"
+    "github.com/otfabric/go-otfp/protocols/modbus"
+    "github.com/otfabric/go-otfp/protocols/mms"
+    "github.com/otfabric/go-otfp/protocols/s7"
 )
 
 func main() {
@@ -341,7 +341,7 @@ func main() {
 ### Convenience: DefaultRegistry
 
 ```go
-import "github.com/otfabric/otfp"
+import "github.com/otfabric/go-otfp"
 
 registry := otfp.DefaultRegistry() // all 10 protocols, canonical order
 engine := core.NewEngine(registry, core.DefaultEngineConfig())

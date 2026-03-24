@@ -1,6 +1,6 @@
-# API Reference — `github.com/otfabric/otfp`
+# API Reference — `github.com/otfabric/go-otfp`
 
-> **Go ≥ 1.25** | Pure stdlib core | CLI uses [cobra](https://github.com/spf13/cobra)
+> **Go ≥ 1.23** | Pure stdlib core | CLI uses [cobra](https://github.com/spf13/cobra)
 
 Complete reference for every exported type, function, and method. Sections
 follow the package layout.
@@ -37,7 +37,7 @@ follow the package layout.
 ## Package `otfp` (root)
 
 ```go
-import "github.com/otfabric/otfp"
+import "github.com/otfabric/go-otfp"
 ```
 
 Convenience package that re-exports common functionality.
@@ -51,7 +51,7 @@ Convenience package that re-exports common functionality.
 ## Package `core`
 
 ```go
-import "github.com/otfabric/otfp/core"
+import "github.com/otfabric/go-otfp/core"
 ```
 
 ### Protocol
@@ -435,7 +435,7 @@ response to determine protocol presence.
 ## Package `transport`
 
 ```go
-import "github.com/otfabric/otfp/transport"
+import "github.com/otfabric/go-otfp/transport"
 ```
 
 Shared TCP transport utilities. Provides context-aware TCP connection
@@ -536,8 +536,8 @@ import (
     "context"
     "fmt"
 
-    "github.com/otfabric/otfp"
-    "github.com/otfabric/otfp/core"
+    "github.com/otfabric/go-otfp"
+    "github.com/otfabric/go-otfp/core"
 )
 
 func main() {

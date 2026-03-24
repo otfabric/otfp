@@ -11,8 +11,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/otfabric/otfp/core"
-	"github.com/otfabric/otfp/transport"
+	"github.com/otfabric/go-otfp/core"
+	"github.com/otfabric/go-otfp/transport"
 )
 
 const (
