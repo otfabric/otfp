@@ -1,16 +1,58 @@
 # otfp — OT Protocol Fingerprinting Library
 
-[![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![Go](https://img.shields.io/badge/Go-1.23%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![Go Reference](https://pkg.go.dev/badge/github.com/otfabric/go-otfp.svg)](https://pkg.go.dev/github.com/otfabric/go-otfp)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Go Report Card](https://goreportcard.com/badge/github.com/otfabric/go-otfp)](https://goreportcard.com/report/github.com/otfabric/go-otfp)
-[![CI](https://github.com/otfp/modbus/actions/workflows/ci.yml/badge.svg)](https://github.com/otfabric/go-otfp/actions/workflows/ci.yml)
-[![Codecov](https://codecov.io/github/otfabric/go-otfp/graph/badge.svg?token=QHOOHJTJHT)](https://codecov.io/github/otfabric/go-otfp)
-[![Release](https://img.shields.io/github/v/release/otfabric/go-otfp?display_name=tag)](https://github.com/otfabric/go-otfp/releases)
+[![CI](https://github.com/otfabric/go-otfp/actions/workflows/ci.yml/badge.svg)](https://github.com/otfabric/go-otfp/actions/workflows/ci.yml)
+[![Codecov](https://codecov.io/gh/otfabric/go-otfp/graph/badge.svg)](https://codecov.io/gh/otfabric/go-otfp)
+[![Release](https://img.shields.io/github/v/release/otfabric/go-otfp?label=release)](https://github.com/otfabric/go-otfp/releases)
 
 
 A pure Go library for OT (Operational Technology) protocol fingerprinting at
 the **connection level only**. Detects industrial protocols based on transport
 framing and handshake behavior — without invoking application-layer logic.
+
+**Stability:** this module is still `v0.0.x`. Public APIs may change between
+minor tags; pin a specific version and review release notes before upgrading.
+
+## Table of contents
+
+- [Supported Protocols](#supported-protocols)
+  - [Protocol Overview](#protocol-overview)
+  - [TCP Detectability Notes](#tcp-detectability-notes)
+  - [Energy & Utility Protocol Coverage](#energy--utility-protocol-coverage)
+- [Key Principles](#key-principles)
+- [Project structure](#project-structure)
+- [Installation](#installation)
+- [CLI Usage (`otprobe`)](#cli-usage-otprobe)
+- [Library Usage](#library-usage)
+- [Architecture](#architecture)
+- [Detection Details](#detection-details)
+- [Security Considerations](#security-considerations)
+- [Building & Testing](#building--testing)
+- [Documentation](#documentation)
+- [License](#license)
+
+---
+
+## Project structure
+
+```
+go-otfp/
+├── otfp.go            Convenience: DefaultRegistry()
+├── core/              Engine, registry, Result/Confidence, typed errors
+├── transport/         Shared TCP dial / send-receive helpers
+├── protocols/         Per-protocol fingerprinters (+ shared iso/ for TPKT/COTP)
+├── cmd/otprobe/       CLI (detect / list / version)
+├── wireshark/         Capture / dissection notes per protocol
+├── API.md             Public API reference
+├── ERRORS.md          Error taxonomy (match vs typed failures)
+├── RELEASE.md         Release history
+└── README.md
+```
+
+Detection orchestration and file-level layout are detailed under
+[Architecture](#architecture). Error taxonomy: [ERRORS.md](ERRORS.md).
 
 ---
 
@@ -80,8 +122,8 @@ real-world deployments:
   Metadata
 - **Structured error handling** — typed errors (`TimeoutError`,
   `ConnectionError`, `InvalidResponseError`, `DetectError`)
-- **Observability** — `Observer` interface for metrics, tracing, and audit
-  logging
+- **Observability** — `Observer` interface for scan progress / audit callbacks
+  (`OnStart` / `OnResult`), not request-latency metrics
 - **Rate limiting** — configurable `MinInterval` between probes for IDS-safe
   scanning
 - **Audit trail** — every `Result` carries a unique `DetectionID` and
@@ -218,7 +260,7 @@ Dry-run: no network traffic will be sent
 Target:          10.0.0.1:502
 Timeout:         5s
 Global Timeout:  0s
-Parallel:        true
+Parallel:        false
 Safe mode:       false
 Max concurrency: 0
 
@@ -431,11 +473,12 @@ registry.Register(&MyProtocolFingerprinter{})
 ## Architecture
 
 ```
-otfp/
+go-otfp/
 ├── otfp.go                    # Convenience: DefaultRegistry()
 ├── core/                      # Core types and engine
 │   ├── engine.go              # Detection orchestration (parallel/sequential, observer, rate-limit)
-│   ├── errors.go              # Typed errors (DetectError, TimeoutError, ConnectionError, InvalidResponseError)
+│   ├── classify.go            # ClassifyDial / ClassifyIO → typed errors
+│   ├── errors.go              # Typed errors (DetectError, TimeoutError, ConnectionError, …)
 │   ├── fingerprinter.go       # Fingerprinter interface (Name, Priority, Detect)
 │   ├── protocol.go            # Protocol uint8 enum with stable constants
 │   ├── registry.go            # Thread-safe protocol registry (priority-sorted)
@@ -445,27 +488,13 @@ otfp/
 │   └── tcp.go                 # TCP connection helpers
 ├── protocols/                 # Protocol implementations
 │   ├── iso/                   # Shared ISO-on-TCP (RFC 1006) utilities
-│   │   └── iso.go             # TPKT/COTP builders and validators
-│   ├── modbus/                # Modbus TCP fingerprinter
-│   ├── mms/                   # IEC 61850 MMS fingerprinter
-│   ├── s7/                    # Siemens S7comm fingerprinter
-│   ├── opcua/                 # OPC UA fingerprinter
-│   ├── bacnet/                # BACnet/IP fingerprinter
-│   ├── can/                   # CAN TCP Gateway fingerprinter
-│   ├── profinet/              # PROFINET fingerprinter
-│   ├── dnp3/                  # DNP3 fingerprinter
-│   ├── iec104/                # IEC 60870-5-104 fingerprinter
-│   └── enip/                  # EtherNet/IP fingerprinter
-├── cmd/
-│   └── otprobe/               # CLI tool (cobra subcommands)
-│       ├── main.go            # Cobra root + detect/list/version commands
-│       ├── buildinfo.go       # Version metadata (GoVersion, Platform)
-│       ├── config.go          # CLIConfig struct, ConfidenceLevel()
-│       ├── output.go          # JSON/text rendering, exit codes, structured errors
-│       ├── run.go             # Detection orchestration, dry-run, list
-│       └── version.txt        # Semantic version
-├── go.mod
+│   ├── modbus/ mms/ s7/ opcua/ bacnet/ can/
+│   ├── profinet/ dnp3/ iec104/ enip/
+├── cmd/otprobe/               # CLI (cobra: detect / list / version; ldflags versioning)
+├── wireshark/                 # Per-protocol capture notes
 ├── API.md                     # Library API reference
+├── ERRORS.md                  # Error taxonomy
+├── RELEASE.md                 # Release history
 └── README.md
 ```
 
@@ -688,6 +717,12 @@ go test ./protocols/modbus/ -fuzz=FuzzValidateResponse -fuzztime=30s
 
 ---
 
+## Documentation
+
+- [API.md](API.md) — Public API reference: engine, results, protocols, CLI JSON shapes.
+- [ERRORS.md](ERRORS.md) — Match vs typed errors; `ClassifyDial` / `ClassifyIO`; `errors.As` patterns.
+- [RELEASE.md](RELEASE.md) — Release history.
+
 ## License
 
-See [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License. See [LICENSE](./LICENSE).

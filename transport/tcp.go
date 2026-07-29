@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // Package transport provides low-level TCP connection utilities for OT protocol detection.
 package transport
 

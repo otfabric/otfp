@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package core
 
 import (
@@ -7,7 +9,8 @@ import (
 	"time"
 )
 
-// Observer receives callbacks during protocol detection for instrumentation.
+// Observer receives scan progress / audit callbacks during protocol detection
+// (OnStart / OnResult). It is not a request-latency metrics hook.
 // Implementations must be safe for concurrent use when Parallel is true.
 // All methods must be non-blocking.
 type Observer interface {
@@ -41,8 +44,8 @@ type EngineConfig struct {
 	// Zero means no delay.
 	MinInterval time.Duration
 
-	// Observer receives callbacks during detection for metrics, tracing,
-	// or audit logging. Nil disables observation.
+	// Observer receives scan progress / audit callbacks during detection.
+	// Nil disables observation. Not a request-metrics hook.
 	Observer Observer
 }
 

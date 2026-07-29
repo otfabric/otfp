@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // Package otfp provides convenience functions for OT protocol fingerprinting.
 package otfp
 

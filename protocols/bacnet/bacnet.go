@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // Package bacnet implements BACnet/IP protocol fingerprinting over TCP.
 //
 // BACnet/IP primarily operates over UDP (port 47808). This detector targets
@@ -52,7 +54,7 @@ func (f *Fingerprinter) Priority() int { return 80 }
 func (f *Fingerprinter) Detect(ctx context.Context, target core.Target) (core.Result, error) {
 	conn, err := transport.Dial(ctx, target.Addr(), target.EffectiveTimeout())
 	if err != nil {
-		return core.NoMatch(protocolName), fmt.Errorf("bacnet: %w", err)
+		return core.NoMatch(protocolName), core.ClassifyDial(protocolName, target.Addr(), err)
 	}
 	defer conn.Close() //nolint:errcheck
 
@@ -60,7 +62,7 @@ func (f *Fingerprinter) Detect(ctx context.Context, target core.Target) (core.Re
 
 	resp, err := conn.SendReceive(probe, maxResponseSize)
 	if err != nil {
-		return core.NoMatch(protocolName), fmt.Errorf("bacnet: %w", err)
+		return core.NoMatch(protocolName), core.ClassifyIO(protocolName, target.Addr(), "sendreceive", err)
 	}
 
 	return validateResponse(resp).WithExchange("probe", probe, resp), nil

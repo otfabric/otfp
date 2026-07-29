@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package s7
 
 import "testing"

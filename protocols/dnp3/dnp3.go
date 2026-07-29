@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // Package dnp3 implements DNP3 (Distributed Network Protocol 3) fingerprinting
 // over TCP.
 //
@@ -57,7 +59,7 @@ func (f *Fingerprinter) Priority() int { return 50 }
 func (f *Fingerprinter) Detect(ctx context.Context, target core.Target) (core.Result, error) {
 	conn, err := transport.Dial(ctx, target.Addr(), target.EffectiveTimeout())
 	if err != nil {
-		return core.NoMatch(protocolName), fmt.Errorf("dnp3: %w", err)
+		return core.NoMatch(protocolName), core.ClassifyDial(protocolName, target.Addr(), err)
 	}
 	defer conn.Close() //nolint:errcheck
 
@@ -65,7 +67,7 @@ func (f *Fingerprinter) Detect(ctx context.Context, target core.Target) (core.Re
 
 	resp, err := conn.SendReceive(probe, maxResponseSize)
 	if err != nil {
-		return core.NoMatch(protocolName), fmt.Errorf("dnp3: %w", err)
+		return core.NoMatch(protocolName), core.ClassifyIO(protocolName, target.Addr(), "sendreceive", err)
 	}
 
 	if isModbusErrorEcho(probe, resp) {

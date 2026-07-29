@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // Package iec104 implements IEC 60870-5-104 protocol fingerprinting over TCP.
 //
 // IEC 104 is the dominant SCADA protocol in European power substations.
@@ -59,7 +61,7 @@ func (f *Fingerprinter) Priority() int { return 40 }
 func (f *Fingerprinter) Detect(ctx context.Context, target core.Target) (core.Result, error) {
 	conn, err := transport.Dial(ctx, target.Addr(), target.EffectiveTimeout())
 	if err != nil {
-		return core.NoMatch(protocolName), fmt.Errorf("iec104: %w", err)
+		return core.NoMatch(protocolName), core.ClassifyDial(protocolName, target.Addr(), err)
 	}
 	defer conn.Close() //nolint:errcheck
 
@@ -67,7 +69,7 @@ func (f *Fingerprinter) Detect(ctx context.Context, target core.Target) (core.Re
 
 	resp, err := conn.SendReceive(probe, maxResponseSize)
 	if err != nil {
-		return core.NoMatch(protocolName), fmt.Errorf("iec104: %w", err)
+		return core.NoMatch(protocolName), core.ClassifyIO(protocolName, target.Addr(), "sendreceive", err)
 	}
 
 	// If the response is an exact echo of our probe, the remote endpoint

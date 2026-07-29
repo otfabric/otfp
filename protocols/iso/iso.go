@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // Package iso provides shared ISO-on-TCP (RFC1006) TPKT/COTP constants and utilities
 // used by both MMS and S7comm fingerprinters.
 package iso

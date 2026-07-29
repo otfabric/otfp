@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // Package can implements CAN-over-TCP gateway fingerprinting.
 //
 // Native CAN bus (Controller Area Network) is not a TCP protocol.
@@ -60,7 +62,7 @@ func (f *Fingerprinter) Priority() int { return 90 }
 func (f *Fingerprinter) Detect(ctx context.Context, target core.Target) (core.Result, error) {
 	conn, err := transport.Dial(ctx, target.Addr(), target.EffectiveTimeout())
 	if err != nil {
-		return core.NoMatch(protocolName), fmt.Errorf("can: %w", err)
+		return core.NoMatch(protocolName), core.ClassifyDial(protocolName, target.Addr(), err)
 	}
 	defer conn.Close() //nolint:errcheck
 

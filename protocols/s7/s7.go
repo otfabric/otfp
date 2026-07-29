@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // Package s7 implements Siemens S7comm protocol fingerprinting over ISO-on-TCP.
 //
 // Detection is performed in two phases:
@@ -58,7 +60,7 @@ func (f *Fingerprinter) Priority() int { return 20 }
 func (f *Fingerprinter) Detect(ctx context.Context, target core.Target) (core.Result, error) {
 	conn, err := transport.Dial(ctx, target.Addr(), target.EffectiveTimeout())
 	if err != nil {
-		return core.NoMatch(protocolName), fmt.Errorf("s7: %w", err)
+		return core.NoMatch(protocolName), core.ClassifyDial(protocolName, target.Addr(), err)
 	}
 	defer conn.Close() //nolint:errcheck
 
@@ -77,7 +79,7 @@ func (f *Fingerprinter) Detect(ctx context.Context, target core.Target) (core.Re
 
 	resp1, err := conn.SendReceive(probe1, maxResponseSize)
 	if err != nil {
-		return core.NoMatch(protocolName), fmt.Errorf("s7: phase1: %w", err)
+		return core.NoMatch(protocolName), core.ClassifyIO(protocolName, target.Addr(), "phase1", err)
 	}
 
 	// Validate Phase 1 response.

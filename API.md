@@ -298,7 +298,7 @@ type EngineConfig struct {
 
 | Field                     | Type            | Default | Description |
 |---------------------------|-----------------|---------|-------------|
-| `Parallel`                | `bool`          | `true`  | Run protocol checks concurrently. |
+| `Parallel`                | `bool`          | `false` | Run protocol checks concurrently. |
 | `EarlyStop`               | `bool`          | `true`  | Stop after first high-confidence match. |
 | `HighConfidenceThreshold` | `Confidence`    | `0.9`   | Threshold for early-stop trigger. |
 | `MaxConcurrency`          | `int`           | `0`     | Max parallel goroutines (0 = unbounded). |
@@ -309,7 +309,7 @@ type EngineConfig struct {
 
 | Function              | Description |
 |-----------------------|-------------|
-| `DefaultEngineConfig()` | Parallel, early-stop, unbounded concurrency. |
+| `DefaultEngineConfig()` | Sequential (`Parallel=false`), early-stop, unbounded concurrency when parallel is enabled. |
 | `SafeEngineConfig()`    | Sequential, early-stop, max concurrency 1. |
 
 #### Engine Methods
@@ -333,9 +333,10 @@ type Observer interface {
 }
 ```
 
-Receives callbacks during detection for metrics, tracing, or audit logging.
-Implementations **must** be safe for concurrent use when `Parallel` is true
-and **must** be non-blocking.
+Receives scan progress / audit callbacks during detection (`OnStart` before
+each attempt, `OnResult` after). It is **not** a request-latency or Prometheus
+metrics hook. Implementations **must** be safe for concurrent use when
+`Parallel` is true and **must** be non-blocking.
 
 | Method     | Called | Description |
 |------------|--------|-------------|
@@ -372,13 +373,20 @@ Structured summary of a complete detection run returned by `Engine.Scan()`.
 
 ### Errors
 
+Short guide: **[ERRORS.md](ERRORS.md)**.
+
 | Type                    | Fields                    | Unwrap | Description |
 |-------------------------|---------------------------|--------|-------------|
 | `DetectError`           | `Protocol`, `Op`, `Err`   | ✓      | Error during detection. `Op` is a short name like `"dial"`, `"send"`, `"receive"`. |
 | `TimeoutError`          | `Protocol`, `Addr`, `Err` | ✓      | Deadline exceeded. |
 | `ConnectionError`       | `Protocol`, `Addr`, `Err` | ✓      | Transport failure (refused, unreachable). |
-| `InvalidResponseError`  | `Protocol`, `Reason`      | —      | Response received but malformed or unexpected framing. |
+| `InvalidResponseError`  | `Protocol`, `Reason`      | —      | Optional: response received but malformed (detectors usually return `NoMatch` instead). |
 | `ProtocolNotFoundError` | `Protocol`                | —      | Requested protocol not in registry. |
+
+Dial failures are classified via `ClassifyDial` (`TimeoutError` /
+`ConnectionError`). Send/receive failures use `ClassifyIO` (`TimeoutError` /
+`DetectError`). Protocol mismatches remain `Result` with `Matched=false`, not
+errors.
 
 All error types implement the `error` interface. Use `errors.As()` for
 type-safe inspection:
